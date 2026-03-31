@@ -318,7 +318,7 @@ function pseudoLegal(board,sq,ep,fr,fc,tr,tc){
 function isLegal(gs,fr,fc,tr,tc){
   const{board,shadowQueens:sq,enPassant:ep,castlingRights:cr}=gs;
   const piece=board[fr][fc];if(!piece)return false;
-  const color=piece[0]==='w'?'white':'black',t=piece[1];
+  const color=piece[0]==='w'?'white':'black',opp=color==='white'?'black':'white',t=piece[1];
   if(t==='k'&&Math.abs(tc-fc)===2)return legalCastle(gs,color,fr,fc,tr,tc);
   if(!pseudoLegal(board,sq,ep,fr,fc,tr,tc))return false;
   const nb=board.map(r=>[...r]);
