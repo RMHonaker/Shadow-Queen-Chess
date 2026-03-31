@@ -310,6 +310,7 @@ function pseudoLegal(board,sq,ep,fr,fc,tr,tc){
   const piece=board[fr][fc];if(!piece)return false;
   const color=piece[0]==='w'?'white':'black',t=piece[1],target=board[tr][tc];
   if(target&&target[0]===piece[0])return false;
+  if(target&&target[1]==='k')return false; // can never capture the king
   const sqd=sq[color],isSQ=sqd&&sqd.row===fr&&sqd.col===fc;
   const orig=()=>{switch(t){case'p':return pawnPseudo(board,ep,fr,fc,tr,tc,color);case'r':return rookRange(board,fr,fc,tr,tc);case'b':return bishopRange(board,fr,fc,tr,tc);case'n':return knightRange(fr,fc,tr,tc);case'k':return kingRange(fr,fc,tr,tc);case'q':return queenRange(board,fr,fc,tr,tc);}};
   if(t==='q')return queenRange(board,fr,fc,tr,tc);if(isSQ&&sqd.revealed)return queenRange(board,fr,fc,tr,tc);if(isSQ&&!sqd.revealed)return orig()||queenRange(board,fr,fc,tr,tc);return orig();
@@ -391,13 +392,11 @@ function applyMove(gs,fr,fc,tr,tc,promoChoice){
     const elapsed=Math.floor((now-gs.lastMoveAt)/1000);
     ntr[color]=Math.max(0,ntr[color]-elapsed);
   }
-  // REVEAL ON CHECK: if the opponent's king is now in check, and the shadow queen
-  // is the piece giving check via a queen move, reveal it immediately.
-  // This handles the case where a blocker moves away and the SQ passively gives check.
+  // REVEAL ON CHECK: if the opponent's king is now in check from the shadow queen,
+  // reveal it immediately. Check both queen-range AND the original piece's attack range.
   if(nsq[opp]&&!nsq[opp].revealed){
     const oppKing=findKing(nb,opp);
-    if(oppKing&&queenRange(nb,nsq[opp].row,nsq[opp].col,oppKing.row,oppKing.col)){
-      // SQ is giving check as a queen — reveal it
+    if(oppKing&&canAttack(nb,nsq,nsq[opp].row,nsq[opp].col,oppKing.row,oppKing.col,nb[nsq[opp].row][nsq[opp].col])){
       nsq[opp]={...nsq[opp],revealed:true};
     }
   }
@@ -815,3 +814,4 @@ function enterGame(){
 </script>
 </body>
 </html>
+
