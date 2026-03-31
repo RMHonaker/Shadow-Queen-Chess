@@ -126,6 +126,24 @@ select option{background:var(--surface2);}
 .waiting-overlay p{font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:0.15em;animation:fadePulse 2s ease-in-out infinite;}
 @keyframes fadePulse{0%,100%{opacity:0.45;}50%{opacity:1;}}
 
+/* MOVE CONFIRMATION */
+.confirm-bar{
+  display:none;
+  gap:8px;margin-top:10px;
+  background:linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.05));
+  border:1px solid rgba(201,168,76,0.3);border-radius:10px;
+  padding:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+}
+.confirm-bar.visible{display:flex;}
+.confirm-msg{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);letter-spacing:0.08em;flex:1;}
+.confirm-btns{display:flex;gap:8px;}
+.btn-confirm{padding:10px 20px;font-family:'Cinzel',serif;font-size:13px;font-weight:700;
+  border:none;border-radius:8px;cursor:pointer;letter-spacing:0.1em;transition:all 0.2s;}
+.btn-confirm.accept{background:linear-gradient(135deg,#1a6b1a,#27ae60);color:#fff;}
+.btn-confirm.accept:hover{filter:brightness(1.15);transform:translateY(-1px);}
+.btn-confirm.cancel{background:linear-gradient(135deg,#8b0000,#c0392b);color:#fff;}
+.btn-confirm.cancel:hover{filter:brightness(1.15);transform:translateY(-1px);}
+
 /* CONTROLS */
 .game-controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
 .game-controls .btn{margin:0;} .ctrl-activate{flex:2;} .ctrl-new{flex:1;}
@@ -226,6 +244,14 @@ select option{background:var(--surface2);}
     <div class="waiting-overlay" id="waiting-overlay"><p>Awaiting opponent…</p></div>
   </div>
 
+  <div class="confirm-bar" id="confirm-bar">
+    <div class="confirm-msg" id="confirm-msg">Move to confirm</div>
+    <div class="confirm-btns">
+      <button class="btn-confirm cancel" id="btn-cancel-move">✗ Cancel</button>
+      <button class="btn-confirm accept" id="btn-accept-move">✓ Confirm</button>
+    </div>
+  </div>
+
   <div class="game-controls">
     <button class="btn purple ctrl-activate" id="btn-activate" disabled>⬡ Activate Shadow Queen</button>
     <button class="btn secondary ctrl-new" id="btn-new-game">New Game</button>
@@ -270,7 +296,8 @@ function initGameState(){
     gameOver:false,moveLog:[],enPassant:null,castlingRights:{white:{kside:true,qside:true},black:{kside:true,qside:true}},
     timeLimitSecs:86400, // default 1 day; set by White on create
     timeRemaining:{white:86400,black:86400}, // seconds remaining per player
-    lastMoveAt:null // epoch ms of last move (for timer continuity on rejoin)
+    lastMoveAt:null, // epoch ms of last move (for timer continuity on rejoin)
+    inCheck:{white:false,black:false} // authoritative check state from White
   };
 }
 
@@ -279,6 +306,7 @@ function initGameState(){
 // ══════════════════════════════════════════════
 let myRole=null,peer=null,conn=null,guestConn=null,spectatorConns=[];
 let selectedSq=null,pendingPromotion=null,waitingForOpponent=true;
+let pendingMoveConfirm=null; // {fr,fc,tr,tc,promo} waiting for player confirmation
 let timerInterval=null;
 let notifGranted=false;
 let originalTitle=document.title;
@@ -351,8 +379,12 @@ function hasAnyLegal(gs,color){
   const{board}=gs;
   for(let fr=0;fr<8;fr++)for(let fc=0;fc<8;fc++){const p=board[fr][fc];if(!p||p[0]!==color[0])continue;for(let tr=0;tr<8;tr++)for(let tc=0;tc<8;tc++){if(fr===tr&&fc===tc)continue;if(isLegal(gs,fr,fc,tr,tc))return true;}if(p[1]==='k'){const hr=color==='white'?7:0;if(isLegal(gs,fr,fc,hr,6)||isLegal(gs,fr,fc,hr,2))return true;}}return false;
 }
-function isCheckmate(gs){if(!isInCheck(gs.board,gs.shadowQueens,gs.currentTurn))return false;return!hasAnyLegal(gs,gs.currentTurn);}
-function isStalemate(gs){if(isInCheck(gs.board,gs.shadowQueens,gs.currentTurn))return false;return!hasAnyLegal(gs,gs.currentTurn);}
+function isCheckmate(gs){
+  const inChk=(gs.inCheck&&gs.inCheck[gs.currentTurn])||isInCheck(gs.board,gs.shadowQueens,gs.currentTurn);
+  if(!inChk)return false;return!hasAnyLegal(gs,gs.currentTurn);}
+function isStalemate(gs){
+  const inChk=(gs.inCheck&&gs.inCheck[gs.currentTurn])||isInCheck(gs.board,gs.shadowQueens,gs.currentTurn);
+  if(inChk)return false;return!hasAnyLegal(gs,gs.currentTurn);}
 function getLegalMoves(gs,fr,fc){const moves=[];for(let tr=0;tr<8;tr++)for(let tc=0;tc<8;tc++){if(fr===tr&&fc===tc)continue;if(isLegal(gs,fr,fc,tr,tc))moves.push({row:tr,col:tc});}const p=gs.board[fr][fc];if(p&&p[1]==='k'){const hr=p[0]==='w'?7:0;if(isLegal(gs,fr,fc,hr,6))moves.push({row:hr,col:6});if(isLegal(gs,fr,fc,hr,2))moves.push({row:hr,col:2});}return moves;}
 
 function applyMove(gs,fr,fc,tr,tc,promoChoice){
@@ -400,10 +432,15 @@ function applyMove(gs,fr,fc,tr,tc,promoChoice){
       nsq[opp]={...nsq[opp],revealed:true};
     }
   }
+  // Compute authoritative inCheck for both sides using FULL shadow queen data
+  const newInCheck={
+    white:isInCheck(nb,nsq,'white'),
+    black:isInCheck(nb,nsq,'black')
+  };
   return{board:nb,currentTurn:opp,shadowQueens:nsq,sqChosen:{...gs.sqChosen},
     gameOver:false,moveLog:[...gs.moveLog,buildNotation(board,fr,fc,tr,tc,piece)],
     enPassant:newEP,castlingRights:ncr,timeLimitSecs:gs.timeLimitSecs,
-    timeRemaining:ntr,lastMoveAt:now};
+    timeRemaining:ntr,lastMoveAt:now,inCheck:newInCheck};
 }
 
 function buildNotation(board,fr,fc,tr,tc,piece){
@@ -503,7 +540,10 @@ function sqName(r,c){return F[c]+R[r];}
 function renderBoard(){
   const boardEl=document.getElementById('board');boardEl.innerHTML='';
   const{board,shadowQueens:sq,currentTurn}=G;
-  const inCheck=isInCheck(board,sq,currentTurn),kingPos=findKing(board,currentTurn);
+  // Use authoritative inCheck from state (White computes with full SQ knowledge)
+  // Fall back to local computation if not available
+  const inCheck=(G.inCheck&&G.inCheck[currentTurn])||isInCheck(board,sq,currentTurn);
+  const kingPos=findKing(board,currentTurn);
   const myTurn=myRole!=='spectator'&&currentTurn===myRole&&bothChosen(G)&&!waitingForOpponent&&!G.gameOver;
   const legalMoves=selectedSq&&myTurn?getLegalMoves(G,selectedSq.row,selectedSq.col):[];
   const flipped=myRole==='black';
@@ -543,7 +583,7 @@ function renderBoard(){
     statusEl.textContent='CHECKMATE — '+winner+' wins!';G.gameOver=true;
     if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   }else if(isStalemate(G)){statusEl.textContent='STALEMATE — Draw!';G.gameOver=true;}
-  else if(inCheck){statusEl.textContent='CHECK!';}
+  else if(inCheck){statusEl.textContent='CHECK! ♔';}
   else{statusEl.textContent='';}
   turnEl.textContent=(currentTurn==='white'?'White':'Black')+"'s Turn";
 
@@ -590,6 +630,8 @@ function renderBoard(){
 // ══════════════════════════════════════════════
 function handleClick(row,col){
   if(G.gameOver||myRole==='spectator'||waitingForOpponent)return;
+  // If there's a pending confirmation, cancel it first
+  if(pendingMoveConfirm){cancelMoveConfirm();return;}
   const piece=G.board[row][col],pColor=piece?piece[0]==='w'?'white':'black':null;
   if(!G.sqChosen[myRole]){
     if(piece&&pColor===myRole&&piece[1]!=='k'&&piece[1]!=='q')selectedSq={row,col};else selectedSq=null;
@@ -608,12 +650,64 @@ function handleClick(row,col){
         pendingPromotion={fr:selectedSq.row,fc:selectedSq.col,tr:row,tc:col};selectedSq=null;showPromotion(myRole);return;
       }
     }
-    commitMove(selectedSq.row,selectedSq.col,row,col,null);
+    // Show confirmation instead of committing immediately
+    showMoveConfirm(selectedSq.row,selectedSq.col,row,col,null);
+    return;
   }
   selectedSq=null;renderBoard();
 }
 
+function showMoveConfirm(fr,fc,tr,tc,promo){
+  pendingMoveConfirm={fr,fc,tr,tc,promo};
+  selectedSq=null;
+  // Show the piece in its new position as a "ghost" preview
+  renderBoardWithPreview(fr,fc,tr,tc);
+  // Show confirm bar
+  const bar=document.getElementById('confirm-bar');
+  const msg=document.getElementById('confirm-msg');
+  const F='abcdefgh',R='87654321';
+  const piece=G.board[fr][fc];
+  const pName=piece?{k:'King',q:'Queen',r:'Rook',b:'Bishop',n:'Knight',p:'Pawn'}[piece[1]]:'';
+  msg.textContent=pName+' '+F[fc]+R[fr]+' → '+F[tc]+R[tr];
+  bar.classList.add('visible');
+}
+
+function renderBoardWithPreview(fr,fc,tr,tc){
+  // Render normal board but show piece at destination as semi-transparent preview
+  renderBoard();
+  // Highlight the from and to squares
+  const boardEl=document.getElementById('board');
+  const flipped=myRole==='black';
+  boardEl.querySelectorAll('.sq').forEach(sq=>{
+    const r=parseInt(sq.dataset.row),c=parseInt(sq.dataset.col);
+    if(r===fr&&c===fc){sq.style.opacity='0.4';} // dimmed from square
+    if(r===tr&&c===tc){
+      // Show piece preview at destination
+      const piece=G.board[fr][fc];
+      if(piece){
+        const existing=sq.querySelector('.piece');
+        if(existing)existing.remove();
+        const pEl=document.createElement('span');
+        pEl.className='piece p-'+(piece[0]==='w'?'white':'black');
+        pEl.style.opacity='0.7';
+        pEl.textContent=pieceChar(piece);
+        sq.insertBefore(pEl,sq.firstChild);
+        sq.style.background='rgba(201,168,76,0.4)';
+      }
+    }
+  });
+}
+
+function cancelMoveConfirm(){
+  pendingMoveConfirm=null;
+  document.getElementById('confirm-bar').classList.remove('visible');
+  selectedSq=null;
+  renderBoard();
+}
+
 function commitMove(fr,fc,tr,tc,promo){
+  pendingMoveConfirm=null;
+  document.getElementById('confirm-bar').classList.remove('visible');
   G=applyMove(G,fr,fc,tr,tc,promo);
   selectedSq=null;renderBoard();
   broadcast({type:'move',fr,fc,tr,tc,promo});
@@ -794,6 +888,16 @@ function doConnect(roomId,role){
   peer.on('error',e=>{document.getElementById('lobby-msg').textContent='Error: '+e.type;});
 }
 
+document.getElementById('btn-accept-move').addEventListener('click',()=>{
+  if(!pendingMoveConfirm)return;
+  const{fr,fc,tr,tc,promo}=pendingMoveConfirm;
+  commitMove(fr,fc,tr,tc,promo);
+});
+
+document.getElementById('btn-cancel-move').addEventListener('click',()=>{
+  cancelMoveConfirm();
+});
+
 function enterGame(){
   document.getElementById('lobby').style.display='none';document.getElementById('game').style.display='block';
   const badge=document.getElementById('my-badge');
@@ -814,4 +918,3 @@ function enterGame(){
 </script>
 </body>
 </html>
-
