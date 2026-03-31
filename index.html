@@ -630,8 +630,8 @@ function renderBoard(){
 // ══════════════════════════════════════════════
 function handleClick(row,col){
   if(G.gameOver||myRole==='spectator'||waitingForOpponent)return;
-  // If there's a pending confirmation, cancel it first
-  if(pendingMoveConfirm){cancelMoveConfirm();return;}
+  // If there's a pending confirmation, ignore board clicks
+  if(pendingMoveConfirm){return;}
   const piece=G.board[row][col],pColor=piece?piece[0]==='w'?'white':'black':null;
   if(!G.sqChosen[myRole]){
     if(piece&&pColor===myRole&&piece[1]!=='k'&&piece[1]!=='q')selectedSq={row,col};else selectedSq=null;
@@ -670,6 +670,8 @@ function showMoveConfirm(fr,fc,tr,tc,promo){
   const pName=piece?{k:'King',q:'Queen',r:'Rook',b:'Bishop',n:'Knight',p:'Pawn'}[piece[1]]:'';
   msg.textContent=pName+' '+F[fc]+R[fr]+' → '+F[tc]+R[tr];
   bar.classList.add('visible');
+  // Scroll confirm bar into view on mobile
+  setTimeout(()=>bar.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
 
 function renderBoardWithPreview(fr,fc,tr,tc){
