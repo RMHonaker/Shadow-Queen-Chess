@@ -893,6 +893,19 @@ function doConnect(roomId,role){
 document.getElementById('btn-accept-move').addEventListener('click',()=>{
   if(!pendingMoveConfirm)return;
   const{fr,fc,tr,tc,promo}=pendingMoveConfirm;
+  const piece=G.board[fr][fc];
+  // Check if this is a regular pawn promotion (not SQ pawn - those auto-convert)
+  if(piece&&piece[1]==='p'&&(tr===0||tr===7)&&promo===null){
+    const sqd=G.shadowQueens[myRole];
+    const isSQpawn=sqd&&sqd.row===fr&&sqd.col===fc;
+    if(!isSQpawn){
+      // Regular pawn - show promotion dialog before committing
+      pendingPromotion={fr,fc,tr,tc};
+      document.getElementById('confirm-bar').classList.remove('visible');
+      showPromotion(myRole);
+      return;
+    }
+  }
   commitMove(fr,fc,tr,tc,promo);
 });
 
