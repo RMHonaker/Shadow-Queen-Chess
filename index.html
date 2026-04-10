@@ -41,6 +41,8 @@ h1{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(20px,4vw,34px);
 #lobby{width:100%;max-width:460px;}
 .lobby-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:14px;}
 .lobby-card h2{font-family:'Cinzel',serif;font-size:13px;font-weight:600;color:var(--gold);letter-spacing:0.2em;margin-bottom:14px;text-transform:uppercase;}
+.spectator-card{background:linear-gradient(135deg,rgba(123,63,160,0.12),rgba(80,30,120,0.08));border-color:rgba(176,111,216,0.3);}
+.spectator-card h2{color:var(--shadow-light);}
 .btn{display:block;width:100%;padding:13px;font-family:'Cinzel',serif;font-size:13px;font-weight:600;
   letter-spacing:0.12em;color:#0d0f14;background:linear-gradient(135deg,var(--gold),var(--gold2));
   border:none;border-radius:8px;cursor:pointer;transition:all 0.2s;margin-bottom:8px;text-transform:uppercase;}
@@ -115,6 +117,8 @@ select option{background:var(--surface2);}
 .sq.valid-move::after{content:'';position:absolute;width:32%;height:32%;border-radius:50%;background:rgba(0,0,0,0.18);z-index:1;pointer-events:none;}
 .sq.valid-capture{outline:3px solid rgba(0,0,0,0.2);outline-offset:-3px;}
 .sq.check-sq{background:rgba(192,57,43,0.65) !important;}
+.sq.last-move-from{background:rgba(201,168,76,0.25) !important;}
+.sq.last-move-to{background:rgba(201,168,76,0.45) !important;}
 .shadow-dot{position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;
   background:var(--shadow-purple);box-shadow:0 0 6px var(--shadow-light);z-index:3;display:none;}
 .shadow-dot.visible{display:block;}
@@ -125,6 +129,21 @@ select option{background:var(--surface2);}
 .waiting-overlay{position:absolute;inset:0;background:rgba(10,12,18,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;border-radius:2px;}
 .waiting-overlay p{font-family:'Cinzel',serif;font-size:14px;color:var(--gold);letter-spacing:0.15em;animation:fadePulse 2s ease-in-out infinite;}
 @keyframes fadePulse{0%,100%{opacity:0.45;}50%{opacity:1;}}
+
+/* REVIEW BAR */
+.review-bar{display:none;background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:8px 14px;margin-bottom:8px;
+  align-items:center;justify-content:center;gap:12px;}
+.review-bar.visible{display:flex;}
+.review-btn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:7px 14px;font-family:'Cinzel',serif;font-size:13px;color:var(--gold);
+  cursor:pointer;transition:all 0.18s;letter-spacing:0.05em;}
+.review-btn:hover{border-color:var(--gold);background:rgba(201,168,76,0.1);}
+.review-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.review-counter{font-family:'Cinzel',serif;font-size:12px;color:var(--text-dim);
+  letter-spacing:0.1em;min-width:80px;text-align:center;}
+.review-live{font-family:'Cinzel',serif;font-size:11px;color:var(--gold);
+  letter-spacing:0.15em;text-transform:uppercase;}
 
 /* MOVE CONFIRMATION */
 .confirm-bar{
@@ -209,11 +228,20 @@ select option{background:var(--surface2);}
   </div>
   <div class="lobby-card">
     <h2>Join a Game</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px;font-family:'Crimson Pro',serif;">Enter as the Black player using a room code or link shared by White.</p>
     <div class="input-row">
       <input type="text" id="join-code" placeholder="Paste room link or code…">
       <button class="btn" id="btn-join" style="width:auto;padding:0 18px;margin:0">Join</button>
     </div>
-    <button class="btn secondary" id="btn-spectate" style="margin-top:2px">Join as Spectator</button>
+  </div>
+
+  <div class="lobby-card spectator-card">
+    <h2>👁 Watch a Game</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:10px;font-family:'Crimson Pro',serif;">Spectators can see <span style="color:var(--shadow-light)">both Shadow Queens</span> — great for learning or kibbitzing. Use the same room link as the players.</p>
+    <div class="input-row">
+      <input type="text" id="spectate-code" placeholder="Paste room link or code…">
+      <button class="btn purple" id="btn-spectate" style="width:auto;padding:0 18px;margin:0">Watch</button>
+    </div>
   </div>
 </div>
 
@@ -244,6 +272,19 @@ select option{background:var(--surface2);}
     <div class="waiting-overlay" id="waiting-overlay"><p>Awaiting opponent…</p></div>
   </div>
 
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+    <button class="btn secondary ctrl-new" id="btn-new-game-top" style="width:auto;padding:8px 18px;margin:0;font-size:11px;">New Game</button>
+  </div>
+
+  <div class="review-bar" id="review-bar">
+    <button class="review-btn" id="btn-review-first" title="First move">⏮</button>
+    <button class="review-btn" id="btn-review-prev" title="Previous move">◀</button>
+    <span class="review-counter" id="review-counter">1 / 1</span>
+    <button class="review-btn" id="btn-review-next" title="Next move">▶</button>
+    <button class="review-btn" id="btn-review-last" title="Last move / Live">⏭</button>
+    <span class="review-live" id="review-live-label" style="display:none">● Live</span>
+  </div>
+
   <div class="confirm-bar" id="confirm-bar">
     <div class="confirm-msg" id="confirm-msg">Move to confirm</div>
     <div class="confirm-btns">
@@ -254,7 +295,6 @@ select option{background:var(--surface2);}
 
   <div class="game-controls">
     <button class="btn purple ctrl-activate" id="btn-activate" disabled>⬡ Activate Shadow Queen</button>
-    <button class="btn secondary ctrl-new" id="btn-new-game">New Game</button>
   </div>
 
   <div id="spectator-panel">
@@ -297,6 +337,7 @@ function initGameState(){
     timeLimitSecs:86400, // default 1 day; set by White on create
     timeRemaining:{white:86400,black:86400}, // seconds remaining per player
     lastMoveAt:null, // epoch ms of last move (for timer continuity on rejoin)
+    lastMove:null // {fr,fc,tr,tc} for highlighting
     inCheck:{white:false,black:false} // authoritative check state from White
   };
 }
@@ -307,6 +348,8 @@ function initGameState(){
 let myRole=null,peer=null,conn=null,guestConn=null,spectatorConns=[];
 let selectedSq=null,pendingPromotion=null,waitingForOpponent=true;
 let pendingMoveConfirm=null; // {fr,fc,tr,tc,promo} waiting for player confirmation
+let boardHistory=[]; // array of board snapshots for review
+let reviewIndex=-1; // -1 means live game, >=0 means reviewing
 let timerInterval=null;
 let notifGranted=false;
 let originalTitle=document.title;
@@ -440,7 +483,7 @@ function applyMove(gs,fr,fc,tr,tc,promoChoice){
   return{board:nb,currentTurn:opp,shadowQueens:nsq,sqChosen:{...gs.sqChosen},
     gameOver:false,moveLog:[...gs.moveLog,buildNotation(board,fr,fc,tr,tc,piece)],
     enPassant:newEP,castlingRights:ncr,timeLimitSecs:gs.timeLimitSecs,
-    timeRemaining:ntr,lastMoveAt:now,inCheck:newInCheck};
+    timeRemaining:ntr,lastMoveAt:now,inCheck:newInCheck,lastMove:{fr,fc,tr,tc}};
 }
 
 function buildNotation(board,fr,fc,tr,tc,piece){
@@ -519,11 +562,14 @@ async function requestNotifPermission(){
   }catch(e){}
 }
 
+let flashInterval=null;
+function stopFlashing(){if(flashInterval){clearInterval(flashInterval);flashInterval=null;document.title=originalTitle;}}
 function notifyMyTurn(){
+  stopFlashing();
   // Tab title flash
   let flashing=true,orig=originalTitle;
-  const interval=setInterval(()=>{document.title=flashing?'♟ YOUR TURN! — Shadow Queen Chess':orig;flashing=!flashing;},1000);
-  const stopFlash=()=>{clearInterval(interval);document.title=orig;};
+  flashInterval=setInterval(()=>{document.title=flashing?'♟ YOUR TURN! — Shadow Queen Chess':orig;flashing=!flashing;},1000);
+  const stopFlash=()=>{stopFlashing();};
   window.addEventListener('focus',stopFlash,{once:true});
   // Push notification
   if(notifGranted&&document.hidden){
@@ -568,6 +614,8 @@ function renderBoard(){
       sqEl.appendChild(dot);
     }
     if(selectedSq&&selectedSq.row===row&&selectedSq.col===col)sqEl.classList.add('selected');
+    if(G.lastMove&&G.lastMove.fr===row&&G.lastMove.fc===col)sqEl.classList.add('last-move-from');
+    if(G.lastMove&&G.lastMove.tr===row&&G.lastMove.tc===col)sqEl.classList.add('last-move-to');
     if(inCheck&&kingPos&&kingPos.row===row&&kingPos.col===col)sqEl.classList.add('check-sq');
     const lm=legalMoves.find(m=>m.row===row&&m.col===col);
     if(lm)sqEl.classList.add(board[row][col]?'valid-capture':'valid-move');
@@ -591,8 +639,11 @@ function renderBoard(){
   const actBtn=document.getElementById('btn-activate');
   const sqBanner=document.getElementById('sq-phase-banner');
   if(myRole==='spectator'||waitingForOpponent||G.gameOver){
-    actBtn.disabled=true;sqBanner.style.display='none';
+    actBtn.disabled=true;actBtn.style.display='none';sqBanner.style.display='none';
+  }else if(bothChosen(G)){
+    actBtn.style.display='none';sqBanner.style.display='none';actBtn.disabled=true;
   }else if(!G.sqChosen[myRole]){
+    actBtn.style.display='block';
     sqBanner.style.display='block';
     if(selectedSq){const p=board[selectedSq.row][selectedSq.col];if(p&&p[0]===myRole[0]&&p[1]!=='k'&&p[1]!=='q'){actBtn.disabled=false;sqBanner.textContent='⬡ Click "Activate Shadow Queen" to empower the selected piece — must be done before any moves';}else{actBtn.disabled=true;sqBanner.textContent='Select any of your pieces (not King or Queen) to become your Shadow Queen';}}
     else{actBtn.disabled=true;sqBanner.textContent='Select any of your pieces (not King or Queen) to become your Shadow Queen';}
@@ -630,6 +681,8 @@ function renderBoard(){
 // ══════════════════════════════════════════════
 function handleClick(row,col){
   if(G.gameOver||myRole==='spectator'||waitingForOpponent)return;
+  // If reviewing history, return to live on board click
+  if(reviewIndex!==-1){reviewIndex=-1;renderBoard();updateReviewControls();return;}
   // If there's a pending confirmation, ignore board clicks
   if(pendingMoveConfirm){return;}
   const piece=G.board[row][col],pColor=piece?piece[0]==='w'?'white':'black':null;
@@ -708,10 +761,16 @@ function cancelMoveConfirm(){
 }
 
 function commitMove(fr,fc,tr,tc,promo){
+  stopFlashing();
   pendingMoveConfirm=null;
   document.getElementById('confirm-bar').classList.remove('visible');
   G=applyMove(G,fr,fc,tr,tc,promo);
-  selectedSq=null;renderBoard();
+  selectedSq=null;
+  // Save snapshot for review
+  boardHistory.push(JSON.parse(JSON.stringify(G)));
+  reviewIndex=-1; // return to live view
+  updateReviewControls();
+  renderBoard();
   broadcast({type:'move',fr,fc,tr,tc,promo});
 }
 
@@ -729,14 +788,16 @@ document.getElementById('btn-activate').addEventListener('click',()=>{
   G=newGs;selectedSq=null;renderBoard();broadcast({type:'activate'});
 });
 
-document.getElementById('btn-new-game').addEventListener('click',()=>{
+function doNewGame(){
   if(myRole!=='white')return;
   const limit=G.timeLimitSecs;
   G=initGameState();G.timeLimitSecs=limit;G.timeRemaining={white:limit,black:limit};
   selectedSq=null;pendingPromotion=null;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   renderBoard();broadcast({type:'newgame',timeLimitSecs:limit});
-});
+}
+document.getElementById('btn-new-game').addEventListener('click',doNewGame);
+document.getElementById('btn-new-game-top').addEventListener('click',doNewGame);
 
 // ══════════════════════════════════════════════
 // NETWORKING
@@ -758,17 +819,25 @@ function broadcast(msg){
 function applyRemoteState(remoteGs){
   const myKnown=G.shadowQueens[myRole];
   G={...G,...remoteGs};
-  if(myRole!=='spectator'&&!G.shadowQueens[myRole]&&myKnown)G={...G,shadowQueens:{...G.shadowQueens,[myRole]:myKnown}};
+  // Only restore our known SQ if the piece at that square is still valid
+  // (not a king/queen, and the piece still exists)
+  if(myRole!=='spectator'&&!G.shadowQueens[myRole]&&myKnown){
+    const piece=G.board[myKnown.row]&&G.board[myKnown.row][myKnown.col];
+    const valid=piece&&piece[0]===myRole[0]&&piece[1]!=='k'&&piece[1]!=='q';
+    if(valid)G={...G,shadowQueens:{...G.shadowQueens,[myRole]:myKnown}};
+  }
 }
 
 function handleRemoteMsg(msg,fromRole){
   if(msg.type==='move'){
     if(myRole==='white'){
       G=applyMove(G,msg.fr,msg.fc,msg.tr,msg.tc,msg.promo);
+      boardHistory.push(JSON.parse(JSON.stringify(G)));
+      reviewIndex=-1;updateReviewControls();
       renderBoard();startTimerTick();
       spectatorConns.forEach(sc=>{if(sc.open)sc.send({...msg,state:sanitizeForRole(G,null)});});
       if(guestConn&&guestConn.open)guestConn.send({type:'stateupdate',state:sanitizeForRole(G,'black')});
-    }else{if(msg.state)applyRemoteState(msg.state);else G=applyMove(G,msg.fr,msg.fc,msg.tr,msg.tc,msg.promo);renderBoard();startTimerTick();}
+    }else{if(msg.state)applyRemoteState(msg.state);else G=applyMove(G,msg.fr,msg.fc,msg.tr,msg.tc,msg.promo);boardHistory.push(JSON.parse(JSON.stringify(G)));reviewIndex=-1;updateReviewControls();renderBoard();startTimerTick();}
     // Notify if now my turn
     if(G.currentTurn===myRole&&!G.gameOver)notifyMyTurn();
   }else if(msg.type==='stateupdate'){if(msg.state)applyRemoteState(msg.state);renderBoard();}
@@ -861,7 +930,8 @@ document.getElementById('btn-create').addEventListener('click',()=>{
 document.getElementById('btn-join').addEventListener('click',()=>joinAs('black'));
 document.getElementById('btn-spectate').addEventListener('click',()=>joinAs('spectator'));
 function joinAs(role){
-  let roomId=document.getElementById('join-code').value.trim();
+  const inputId=role==='spectator'?'spectate-code':'join-code';
+  let roomId=document.getElementById(inputId).value.trim();
   if(roomId.includes('?room='))roomId=roomId.split('?room=')[1];
   if(!roomId){document.getElementById('lobby-msg').textContent='Please enter a room code.';return;}
   myRole=role;document.getElementById('lobby-msg').textContent='Connecting…';
@@ -889,6 +959,61 @@ function doConnect(roomId,role){
   });
   peer.on('error',e=>{document.getElementById('lobby-msg').textContent='Error: '+e.type;});
 }
+
+// ══════════════════════════════════════════════
+// MOVE REVIEW
+// ══════════════════════════════════════════════
+function updateReviewControls(){
+  const bar=document.getElementById('review-bar');
+  const counter=document.getElementById('review-counter');
+  const liveLabel=document.getElementById('review-live-label');
+  const btnFirst=document.getElementById('btn-review-first');
+  const btnPrev=document.getElementById('btn-review-prev');
+  const btnNext=document.getElementById('btn-review-next');
+  const btnLast=document.getElementById('btn-review-last');
+  if(boardHistory.length===0){bar.classList.remove('visible');return;}
+  bar.classList.add('visible');
+  const isLive=reviewIndex===-1;
+  const idx=isLive?boardHistory.length-1:reviewIndex;
+  counter.textContent=(idx+1)+' / '+boardHistory.length;
+  liveLabel.style.display=isLive?'inline':'none';
+  btnFirst.disabled=idx===0;
+  btnPrev.disabled=idx===0;
+  btnNext.disabled=isLive;
+  btnLast.disabled=isLive;
+}
+
+function renderReviewBoard(){
+  const idx=reviewIndex===-1?boardHistory.length-1:reviewIndex;
+  if(idx<0||!boardHistory[idx])return;
+  const snap=boardHistory[idx];
+  // Temporarily set G to snapshot for rendering
+  const live=G;
+  G=snap;
+  renderBoard();
+  G=live;
+  updateReviewControls();
+}
+
+document.getElementById('btn-review-first').addEventListener('click',()=>{
+  if(boardHistory.length===0)return;
+  reviewIndex=0;renderReviewBoard();
+});
+document.getElementById('btn-review-prev').addEventListener('click',()=>{
+  if(boardHistory.length===0)return;
+  const cur=reviewIndex===-1?boardHistory.length-1:reviewIndex;
+  reviewIndex=Math.max(0,cur-1);renderReviewBoard();
+});
+document.getElementById('btn-review-next').addEventListener('click',()=>{
+  if(reviewIndex===-1||boardHistory.length===0)return;
+  reviewIndex=Math.min(boardHistory.length-1,reviewIndex+1);
+  if(reviewIndex===boardHistory.length-1)reviewIndex=-1;
+  reviewIndex===-1?renderBoard():renderReviewBoard();
+  updateReviewControls();
+});
+document.getElementById('btn-review-last').addEventListener('click',()=>{
+  reviewIndex=-1;renderBoard();updateReviewControls();
+});
 
 document.getElementById('btn-accept-move').addEventListener('click',()=>{
   if(!pendingMoveConfirm)return;
@@ -920,14 +1045,17 @@ function enterGame(){
   else if(myRole==='black'){badge.className='player-badge badge-black';badge.textContent='♚ Playing Black';}
   else{badge.className='player-badge badge-spectator';badge.textContent='👁 Spectator';}
   if(myRole==='spectator'){document.getElementById('spectator-panel').style.display='block';document.getElementById('btn-activate').style.display='none';document.getElementById('btn-new-game').style.display='none';}
-  if(myRole==='black'){document.getElementById('btn-new-game').style.display='none';}
+  if(myRole==='black'){document.getElementById('btn-new-game').style.display='none';document.getElementById('btn-new-game-top').style.display='none';}
   renderBoard();
 }
 
 // Auto-fill room from URL + auto-join as black if ?room= present
 (function(){
   const p=new URLSearchParams(window.location.search),r=p.get('room');
-  if(r){document.getElementById('join-code').value=r;}
+  if(r){
+    document.getElementById('join-code').value=r;
+    document.getElementById('spectate-code').value=r;
+  }
 })();
 
 </script>
