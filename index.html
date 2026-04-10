@@ -337,7 +337,7 @@ function initGameState(){
     timeLimitSecs:86400, // default 1 day; set by White on create
     timeRemaining:{white:86400,black:86400}, // seconds remaining per player
     lastMoveAt:null, // epoch ms of last move (for timer continuity on rejoin)
-    lastMove:null // {fr,fc,tr,tc} for highlighting
+    lastMove:null, // {fr,fc,tr,tc} for highlighting
     inCheck:{white:false,black:false} // authoritative check state from White
   };
 }
